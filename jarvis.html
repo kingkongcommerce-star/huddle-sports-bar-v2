@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Huddle Command HUD</title>
+<meta name="description" content="JARVIS-style operations dashboard for The Huddle Sports Bar, Saigon.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#02070d;
+    --cyan:#35e0ff;
+    --cyan-dim:rgba(53,224,255,.35);
+    --cyan-faint:rgba(53,224,255,.08);
+    --orange:#ff5c00;
+    --red:#ff3355;
+    --green:#3dffa8;
+    --text:#cfefff;
+    --muted:#5f8aa0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:13px;
+    overflow-x:hidden;
+    background-image:
+      radial-gradient(ellipse at 50% 40%,rgba(53,224,255,.10),transparent 60%),
+      linear-gradient(rgba(53,224,255,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(53,224,255,.04) 1px,transparent 1px);
+    background-size:100% 100%,40px 40px,40px 40px;
+  }
+  body::after{ /* scanlines */
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);
+  }
+  h1,h2,.orb{font-family:'Orbitron',sans-serif;text-transform:uppercase;letter-spacing:3px;}
+  .glow{text-shadow:0 0 8px var(--cyan-dim),0 0 18px var(--cyan-dim);}
+
+  /* Boot overlay */
+  #boot{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;transition:opacity .8s;}
+  #boot pre{color:var(--cyan);font-size:12px;min-height:150px;width:min(520px,90vw);white-space:pre-wrap;}
+  #boot button{font-family:'Orbitron';background:transparent;color:var(--cyan);border:1px solid var(--cyan);
+    padding:12px 26px;letter-spacing:4px;cursor:pointer;box-shadow:0 0 18px var(--cyan-dim) inset;}
+  #boot button:hover{background:var(--cyan-faint);}
+
+  /* Layout */
+  header{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;
+    border-bottom:1px solid var(--cyan-dim);gap:12px;flex-wrap:wrap;}
+  header h1{font-size:18px;color:var(--cyan);}
+  header h1 span{color:var(--orange);}
+  .status{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:12px;}
+  .status b{color:var(--green);font-weight:400;}
+  .sim{color:var(--orange);border:1px solid var(--orange);padding:2px 8px;font-size:11px;letter-spacing:2px;}
+
+  .grid{display:grid;gap:16px;padding:16px 22px 22px;
+    grid-template-columns:minmax(260px,1fr) minmax(340px,1.3fr) minmax(260px,1fr);
+    grid-template-areas:"fix core floor" "stock core book" "rev log book";}
+  .panel{position:relative;border:1px solid var(--cyan-dim);background:linear-gradient(180deg,rgba(53,224,255,.05),rgba(2,7,13,.6));
+    padding:14px 16px;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));
+    min-width:0;}
+  .panel::before,.panel::after{content:"";position:absolute;width:14px;height:14px;border-color:var(--cyan);border-style:solid;}
+  .panel::before{top:-1px;left:-1px;border-width:2px 0 0 2px;}
+  .panel::after{bottom:-1px;right:-1px;border-width:0 2px 2px 0;}
+  .panel h2{font-size:11px;color:var(--cyan);margin-bottom:12px;display:flex;justify-content:space-between;}
+  .panel h2 small{color:var(--muted);font-family:'Share Tech Mono';letter-spacing:1px;}
+
+  /* Core reactor */
+  .core{grid-area:core;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    clip-path:none;border:none;background:none;}
+  .core::before,.core::after{display:none;}
+  .reactor{position:relative;width:min(360px,80vw);aspect-ratio:1;}
+  .reactor svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
+  .spin{transform-origin:200px 200px;animation:spin 24s linear infinite;}
+  .spin.r{animation-direction:reverse;animation-duration:16s;}
+  .spin.f{animation-duration:8s;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .pulse{animation:pulse 2.4s ease-in-out infinite;transform-origin:200px 200px;}
+  @keyframes pulse{50%{opacity:.55;transform:scale(.94);}}
+  .reactor.talking .pulse{animation-duration:.35s;}
+  .core-read{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+  .core-read .t{font-family:'Orbitron';font-size:clamp(26px,5vw,40px);color:#eaffff;}
+  .core-read .d{color:var(--muted);letter-spacing:3px;font-size:11px;margin-top:4px;}
+  .core-read .cap{margin-top:10px;color:var(--orange);font-family:'Orbitron';font-size:12px;letter-spacing:3px;}
+
+  .say{width:100%;max-width:520px;min-height:42px;text-align:center;color:var(--cyan);font-size:14px;}
+  .cmd{display:flex;width:100%;max-width:520px;border:1px solid var(--cyan-dim);}
+  .cmd input{flex:1;min-width:0;background:transparent;border:none;color:var(--text);font:inherit;padding:11px 12px;outline:none;}
+  .cmd input::placeholder{color:var(--muted);}
+  .cmd button{background:var(--cyan-faint);border:none;border-left:1px solid var(--cyan-dim);color:var(--cyan);
+    font-family:'Orbitron';font-size:11px;letter-spacing:2px;padding:0 14px;cursor:pointer;}
+  .cmd button:hover{background:rgba(53,224,255,.18);}
+  .cmd button.live{color:var(--red);}
+  .hints{color:var(--muted);font-size:11px;text-align:center;max-width:520px;}
+  .hints span{color:var(--cyan);cursor:pointer;}
+
+  /* Fixtures */
+  .fix{grid-area:fix;}
+  .match{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px dashed var(--cyan-faint);}
+  .match:last-child{border:none;}
+  .match .teams{color:#eaffff;}
+  .match .sc{font-family:'Orbitron';color:var(--cyan);text-align:right;}
+  .match .meta{color:var(--muted);font-size:11px;}
+  .match .min{text-align:right;font-size:11px;}
+  .live-dot{color:var(--red);}
+  .live-dot::before{content:"● ";animation:blink 1s steps(2) infinite;}
+  @keyframes blink{50%{opacity:0;}}
+
+  /* Floor */
+  .floor{grid-area:floor;}
+  .zones{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+  .zone{height:58px;border:1px solid var(--cyan-dim);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:10px;color:var(--muted);transition:all .4s;}
+  .zone b{font-family:'Orbitron';font-size:12px;color:var(--text);font-weight:400;}
+  .zone.busy{background:rgba(255,92,0,.15);border-color:var(--orange);}
+  .zone.busy b{color:var(--orange);}
+  .occ{margin-top:12px;display:flex;justify-content:space-between;align-items:baseline;}
+  .occ .num{font-family:'Orbitron';font-size:26px;color:var(--cyan);}
+
+  /* Bars */
+  .stock{grid-area:stock;}
+  .bar{margin-bottom:9px;}
+  .bar .lbl{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;}
+  .bar .track{height:6px;background:var(--cyan-faint);position:relative;overflow:hidden;}
+  .bar .fill{height:100%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);transition:width 1s;}
+  .bar.low .fill{background:var(--red);box-shadow:0 0 10px var(--red);}
+  .bar.low .lbl span:last-child{color:var(--red);}
+
+  /* Bookings */
+  .book{grid-area:book;}
+  .bk{display:grid;grid-template-columns:52px 1fr auto;gap:10px;padding:9px 0;border-bottom:1px dashed var(--cyan-faint);align-items:center;}
+  .bk .time{font-family:'Orbitron';color:var(--cyan);font-size:12px;}
+  .bk .who{color:#eaffff;}
+  .bk .what{color:var(--muted);font-size:11px;}
+  .tag{font-size:10px;padding:2px 6px;border:1px solid var(--cyan-dim);color:var(--cyan);}
+  .tag.vip{border-color:var(--orange);color:var(--orange);}
+
+  /* Revenue */
+  .rev{grid-area:rev;}
+  .rev .big{font-family:'Orbitron';font-size:28px;color:#eaffff;}
+  .rev .delta{color:var(--green);font-size:12px;margin-left:6px;}
+  .rev canvas{width:100%;height:90px;margin-top:8px;display:block;}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+  .kpis div{border-left:2px solid var(--cyan-dim);padding-left:8px;}
+  .kpis small{color:var(--muted);font-size:10px;display:block;}
+  .kpis b{font-family:'Orbitron';font-weight:400;font-size:14px;color:var(--cyan);}
+
+  /* Log */
+  .log{grid-area:log;}
+  .log ul{list-style:none;height:170px;overflow:hidden;display:flex;flex-direction:column-reverse;}
+  .log li{padding:3px 0;color:var(--muted);font-size:12px;animation:in .4s;}
+  .log li time{color:var(--cyan);margin-right:8px;}
+  .log li.warn{color:var(--orange);}
+  .log li.you{color:#eaffff;}
+  @keyframes in{from{opacity:0;transform:translateX(-8px);}}
+
+  @media (max-width:1100px){
+    .grid{grid-template-columns:1fr 1fr;grid-template-areas:"core core" "fix floor" "stock book" "rev log";}
+  }
+  @media (max-width:680px){
+    header,.grid{padding-left:16px;padding-right:16px;}
+    .grid{grid-template-columns:1fr;grid-template-areas:"core" "fix" "floor" "book" "stock" "rev" "log";}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <pre id="bootlog"></pre>
+  <button id="bootBtn" hidden>ENGAGE</button>
+</div>
+
+<header>
+  <h1 class="glow">H.U.D.D.L.E. <span>//</span> Command</h1>
+  <div class="status">
+    <span>SYS <b>ONLINE</b></span>
+    <span>NET <b>STABLE</b></span>
+    <span>SCREENS <b id="scrCount">12/12</b></span>
+    <span>LOC D1 · SAIGON</span>
+    <span class="sim" title="No live data feeds are connected yet. All numbers are generated in the browser.">SIMULATED DATA</span>
+  </div>
+</header>
+
+<main class="grid">
+
+  <section class="panel fix">
+    <h2>On Screens <small>live feed</small></h2>
+    <div id="fixtures"></div>
+  </section>
+
+  <section class="panel core">
+    <div class="reactor" id="reactor">
+      <svg viewBox="0 0 400 400" aria-hidden="true">
+        <defs>
+          <radialGradient id="cg"><stop offset="0" stop-color="#eaffff"/><stop offset=".35" stop-color="#35e0ff" stop-opacity=".9"/><stop offset="1" stop-color="#35e0ff" stop-opacity="0"/></radialGradient>
+        </defs>
+        <g class="spin"><circle cx="200" cy="200" r="190" fill="none" stroke="#35e0ff" stroke-opacity=".25" stroke-width="1"/>
+          <circle cx="200" cy="200" r="182" fill="none" stroke="#35e0ff" stroke-width="2" stroke-dasharray="2 10"/></g>
+        <g class="spin r"><circle cx="200" cy="200" r="165" fill="none" stroke="#35e0ff" stroke-width="6" stroke-opacity=".55" stroke-dasharray="90 40 20 40"/></g>
+        <g class="spin f"><circle cx="200" cy="200" r="145" fill="none" stroke="#ff5c00" stroke-width="2" stroke-dasharray="40 300"/></g>
+        <g class="spin r" style="animation-duration:40s"><circle cx="200" cy="200" r="128" fill="none" stroke="#35e0ff" stroke-opacity=".4" stroke-width="14" stroke-dasharray="3 6"/></g>
+        <circle id="ring" cx="200" cy="200" r="108" fill="none" stroke="#35e0ff" stroke-width="3" stroke-linecap="round"
+          transform="rotate(-90 200 200)" stroke-dasharray="0 679" style="filter:drop-shadow(0 0 6px #35e0ff);transition:stroke-dasharray 1s"/>
+        <circle cx="200" cy="200" r="108" fill="none" stroke="#35e0ff" stroke-opacity=".12" stroke-width="3"/>
+        <circle class="pulse" cx="200" cy="200" r="70" fill="url(#cg)" opacity=".35"/>
+      </svg>
+      <div class="core-read">
+        <div class="t glow" id="clock">--:--</div>
+        <div class="d" id="date">----</div>
+        <div class="cap" id="cap">CAPACITY --%</div>
+      </div>
+    </div>
+    <div class="say" id="say">Good evening. All systems nominal.</div>
+    <form class="cmd" id="cmd" autocomplete="off">
+      <input id="q" placeholder="Ask JARVIS… (e.g. status, stock, next booking)" aria-label="Command">
+      <button type="button" id="mic" title="Voice command">MIC</button>
+      <button type="submit">SEND</button>
+    </form>
+    <div class="hints">Try: <span>status</span> · <span>what's on</span> · <span>low stock</span> · <span>next booking</span> · <span>revenue</span> · <span>mute</span></div>
+  </section>
+
+  <section class="panel floor">
+    <h2>Floor Scan <small>16 zones</small></h2>
+    <div class="zones" id="zones"></div>
+    <div class="occ"><span>GUESTS IN HOUSE</span><span class="num" id="guests">0</span></div>
+  </section>
+
+  <section class="panel stock">
+    <h2>Bar Inventory <small>kegs · bottles</small></h2>
+    <div id="stock"></div>
+  </section>
+
+  <section class="panel book">
+    <h2>Tonight's Bookings <small id="bkCount"></small></h2>
+    <div id="bookings"></div>
+  </section>
+
+  <section class="panel rev">
+    <h2>Takings Tonight <small>VND</small></h2>
+    <div><span class="big" id="revBig">0</span><span class="delta" id="revDelta"></span></div>
+    <canvas id="spark" width="600" height="180"></canvas>
+    <div class="kpis">
+      <div><small>TABS OPEN</small><b id="tabs">0</b></div>
+      <div><small>AVG SPEND</small><b id="avg">0</b></div>
+      <div><small>PINTS POURED</small><b id="pints">0</b></div>
+    </div>
+  </section>
+
+  <section class="panel log">
+    <h2>System Log <small>events</small></h2>
+    <ul id="log"></ul>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const rnd = (a, b) => Math.random() * (b - a) + a;
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const vnd = n => Math.round(n).toLocaleString('en-US');
+  const tz = 'Asia/Ho_Chi_Minh';
+  const nowStr = () => new Date().toLocaleTimeString('en-GB', {timeZone: tz, hour12: false});
+
+  // ---------- Simulated state (swap these for real feeds later) ----------
+  const state = {
+    fixtures: [
+      {lg: 'EPL', h: 'Arsenal', a: 'Chelsea', hs: 1, as: 0, min: 34, scr: 'Main + 1-4'},
+      {lg: 'LA LIGA', h: 'Real Madrid', a: 'Sevilla', hs: 0, as: 0, min: 12, scr: 'Screens 5-7'},
+      {lg: 'UFC', h: 'Prelims', a: 'Card 2', hs: null, as: null, min: null, scr: 'Screen 8', note: 'Round 2'},
+      {lg: 'F1', h: 'Qualifying', a: 'Replay', hs: null, as: null, min: null, scr: 'Screens 9-10', note: 'Q3'},
+    ],
+    stock: [
+      {n: 'Tiger Draught', v: 68}, {n: 'Heineken', v: 41}, {n: 'Guinness', v: 14},
+      {n: 'Pasteur Saigon IPA', v: 55}, {n: 'Jameson', v: 22}, {n: 'Jägermeister', v: 9},
+    ],
+    bookings: [
+      {t: '19:00', who: 'Minh — Birthday', what: 'Party room · 24 pax', vip: true},
+      {t: '19:30', who: 'Darts League', what: 'Boards 1-2 · 8 pax'},
+      {t: '20:00', who: 'Sarah K.', what: 'Booth 3 · 6 pax · EPL'},
+      {t: '21:15', who: 'Office Drinks — FPT', what: 'Upstairs · 18 pax', vip: true},
+      {t: '22:00', who: 'Pool Tourney', what: 'Tables 1-2 · 12 pax'},
+    ],
+    zones: ['BAR1', 'BAR2', 'BTH1', 'BTH2', 'BTH3', 'BTH4', 'POOL1', 'POOL2', 'DART1', 'DART2', 'HT1', 'HT2', 'HT3', 'TERR', 'VIP', 'UPST'],
+    busy: new Set(), guests: 0, capacity: 120,
+    rev: 0, revHist: [], tabs: 0, pints: 0,
+  };
+  let muted = false;
+
+  // ---------- Voice ----------
+  function speak(text) {
+    $('say').textContent = text;
+    if (muted || !('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = speechSynthesis.getVoices().find(v => /en-GB/i.test(v.lang) && /male|daniel|george|arthur/i.test(v.name))
+           || speechSynthesis.getVoices().find(v => /en-GB/i.test(v.lang));
+    if (v) u.voice = v;
+    u.rate = 1.02; u.pitch = .9;
+    u.onstart = () => $('reactor').classList.add('talking');
+    u.onend = () => $('reactor').classList.remove('talking');
+    speechSynthesis.speak(u);
+  }
+
+  function log(msg, cls = '') {
+    const li = document.createElement('li');
+    if (cls) li.className = cls;
+    li.innerHTML = `<time>${nowStr()}</time>`;
+    li.append(msg);
+    $('log').prepend(li);
+    while ($('log').children.length > 30) $('log').lastChild.remove();
+  }
+
+  // ---------- Renderers ----------
+  function renderFixtures() {
+    $('fixtures').innerHTML = state.fixtures.map(f => `
+      <div class="match">
+        <div class="teams">${f.h} <span style="color:var(--muted)">v</span> ${f.a}</div>
+        <div class="sc">${f.hs === null ? '—' : f.hs + ' : ' + f.as}</div>
+        <div class="meta">${f.lg} · ${f.scr}</div>
+        <div class="min live-dot">${f.min !== null ? f.min + "'" : f.note}</div>
+      </div>`).join('');
+  }
+  function renderStock() {
+    $('stock').innerHTML = state.stock.map(s => `
+      <div class="bar ${s.v < 20 ? 'low' : ''}">
+        <div class="lbl"><span>${s.n}</span><span>${Math.round(s.v)}%</span></div>
+        <div class="track"><div class="fill" style="width:${s.v}%"></div></div>
+      </div>`).join('');
+  }
+  function renderBookings() {
+    $('bkCount').textContent = state.bookings.length + ' parties';
+    $('bookings').innerHTML = state.bookings.map(b => `
+      <div class="bk">
+        <div class="time">${b.t}</div>
+        <div><div class="who">${b.who}</div><div class="what">${b.what}</div></div>
+        <span class="tag ${b.vip ? 'vip' : ''}">${b.vip ? 'VIP' : 'CONF'}</span>
+      </div>`).join('');
+  }
+  function renderZones() {
+    $('zones').innerHTML = state.zones.map((z, i) =>
+      `<div class="zone ${state.busy.has(i) ? 'busy' : ''}"><b>${z}</b>${state.busy.has(i) ? 'ACTIVE' : 'OPEN'}</div>`).join('');
+    $('guests').textContent = state.guests;
+    const pct = Math.min(100, Math.round(state.guests / state.capacity * 100));
+    $('cap').textContent = `CAPACITY ${pct}%`;
+    $('ring').setAttribute('stroke-dasharray', `${6.79 * pct} 679`);
+    $('ring').setAttribute('stroke', pct > 85 ? '#ff5c00' : '#35e0ff');
+  }
+  function renderRev() {
+    $('revBig').textContent = vnd(state.rev);
+    $('tabs').textContent = state.tabs;
+    $('pints').textContent = state.pints;
+    $('avg').textContent = state.guests ? vnd(state.rev / state.guests / 1000) + 'k' : '0';
+    const h = state.revHist, n = h.length;
+    if (n > 1) $('revDelta').textContent = '▲ ' + vnd(h[n - 1] - h[Math.max(0, n - 6)]) + ' / 30s';
+    const c = $('spark'), x = c.getContext('2d');
+    x.clearRect(0, 0, c.width, c.height);
+    if (n < 2) return;
+    const max = Math.max(...h), min = Math.min(...h);
+    x.beginPath();
+    h.forEach((v, i) => {
+      const px = i / (n - 1) * c.width, py = c.height - 10 - (v - min) / (max - min || 1) * (c.height - 20);
+      i ? x.lineTo(px, py) : x.moveTo(px, py);
+    });
+    x.strokeStyle = '#35e0ff'; x.lineWidth = 3; x.shadowColor = '#35e0ff'; x.shadowBlur = 12; x.stroke();
+    x.lineTo(c.width, c.height); x.lineTo(0, c.height); x.closePath();
+    const g = x.createLinearGradient(0, 0, 0, c.height);
+    g.addColorStop(0, 'rgba(53,224,255,.25)'); g.addColorStop(1, 'rgba(53,224,255,0)');
+    x.shadowBlur = 0; x.fillStyle = g; x.fill();
+  }
+  function tickClock() {
+    const d = new Date();
+    $('clock').textContent = d.toLocaleTimeString('en-GB', {timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+    $('date').textContent = d.toLocaleDateString('en-GB', {timeZone: tz, weekday: 'short', day: '2-digit', month: 'short'}).toUpperCase() + ' · ICT';
+  }
+
+  // ---------- Simulation loop ----------
+  function simulate() {
+    // Guests drift
+    state.guests = Math.max(10, Math.min(state.capacity + 8, state.guests + Math.round(rnd(-3, 5))));
+    // Zones flip
+    const i = Math.floor(rnd(0, state.zones.length));
+    if (state.busy.has(i) && Math.random() < .4) { state.busy.delete(i); log(`${state.zones[i]} cleared — ready for guests.`); }
+    else if (!state.busy.has(i)) state.busy.add(i);
+    // Sales
+    const sale = rnd(80, 900) * 1000;
+    state.rev += sale; state.revHist.push(state.rev); if (state.revHist.length > 40) state.revHist.shift();
+    state.pints += Math.round(rnd(0, 4));
+    state.tabs = Math.max(4, Math.round(state.guests / 3.2));
+    // Stock drains
+    state.stock.forEach(s => { s.v = Math.max(2, s.v - rnd(0, .8)); });
+    const low = state.stock.find(s => s.v < 15 && !s.warned);
+    if (low) { low.warned = true; log(`${low.n} below 15%. Recommend restock.`, 'warn'); }
+    // Matches progress
+    state.fixtures.forEach(f => {
+      if (f.min === null) return;
+      f.min = f.min >= 90 ? 1 : f.min + 1;
+      if (Math.random() < .04) {
+        const home = Math.random() < .5; home ? f.hs++ : f.as++;
+        const msg = `GOAL — ${home ? f.h : f.a}. ${f.h} ${f.hs}, ${f.a} ${f.as}.`;
+        log(msg, 'warn'); speak(msg);
+      }
+    });
+    if (state.guests > state.capacity * .9 && Math.random() < .15) log('Capacity above 90%. Door team advised.', 'warn');
+
+    renderFixtures(); renderStock(); renderZones(); renderRev();
+  }
+
+  // ---------- Commands ----------
+  const handlers = [
+    [/status|report|how.*(we|things)/, () => {
+      const pct = Math.round(state.guests / state.capacity * 100);
+      const low = state.stock.filter(s => s.v < 20).map(s => s.n);
+      return `${state.guests} guests in house, ${pct} percent capacity. ${state.busy.size} of ${state.zones.length} zones active. ` +
+        (low.length ? `${low.length} items running low.` : 'Inventory is healthy.');
+    }],
+    [/what'?s on|screen|match|score|game/, () => state.fixtures.filter(f => f.hs !== null)
+      .map(f => `${f.h} ${f.hs}, ${f.a} ${f.as}, ${f.min} minutes`).join('. ') + '.'],
+    [/stock|inventory|low|restock|beer|keg/, () => {
+      const low = state.stock.filter(s => s.v < 20);
+      return low.length ? `Low on ${low.map(s => `${s.n} at ${Math.round(s.v)} percent`).join(', ')}.` : 'All lines above twenty percent.';
+    }],
+    [/book|reservation|party|next/, () => {
+      const t = new Date().toLocaleTimeString('en-GB', {timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false});
+      const b = state.bookings.find(b => b.t > t) || state.bookings[0];
+      return `Next booking: ${b.who} at ${b.t}, ${b.what.replace(/ ·/g, ',')}.`;
+    }],
+    [/revenue|takings|money|sales/, () => `Tonight's takings stand at ${vnd(state.rev)} dong across ${state.tabs} open tabs.`],
+    [/mute|quiet|silence/, () => { muted = true; speechSynthesis?.cancel(); return 'Voice muted. Text only.'; }],
+    [/unmute|speak|voice on/, () => { muted = false; return 'Voice restored.'; }],
+    [/hello|hi|hey|jarvis/, () => 'At your service. The Huddle is running smoothly.'],
+    [/who are you|what are you/, () => 'Just A Rather Very Intelligent System. For a sports bar.'],
+  ];
+  function run(q) {
+    q = q.trim(); if (!q) return;
+    log('> ' + q, 'you');
+    const lc = q.toLowerCase();
+    // unmute must win over mute
+    const h = /unmute/.test(lc) ? handlers.find(([r]) => r.source.startsWith('unmute')) : handlers.find(([r]) => r.test(lc));
+    const reply = h ? h[1]() : "I'm afraid that's outside my current protocols. Try status, stock, or next booking.";
+    log(reply); speak(reply);
+  }
+  $('cmd').addEventListener('submit', e => { e.preventDefault(); run($('q').value); $('q').value = ''; });
+  document.querySelectorAll('.hints span').forEach(s => s.addEventListener('click', () => run(s.textContent)));
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    const rec = new SR(); rec.lang = 'en-GB'; rec.interimResults = false;
+    rec.onresult = e => run(e.results[0][0].transcript);
+    rec.onend = () => $('mic').classList.remove('live');
+    $('mic').addEventListener('click', () => { $('mic').classList.add('live'); rec.start(); });
+  } else {
+    $('mic').disabled = true; $('mic').title = 'Voice input not supported in this browser'; $('mic').style.opacity = .35;
+  }
+
+  // ---------- Boot ----------
+  const bootLines = [
+    'J.A.R.V.I.S. v4.2 // HUDDLE SPORTS BAR',
+    'Initialising core systems ........ OK',
+    'Linking 12 display feeds ......... OK',
+    'Floor sensors (16 zones) ......... OK',
+    'POS bridge ....................... SIMULATED',
+    'Inventory telemetry .............. SIMULATED',
+    'Voice synthesis .................. ' + ('speechSynthesis' in window ? 'OK' : 'UNAVAILABLE'),
+    '', 'Ready.',
+  ];
+  let bi = 0;
+  (function typeBoot() {
+    if (bi < bootLines.length) { $('bootlog').textContent += bootLines[bi++] + '\n'; setTimeout(typeBoot, 160); }
+    else $('bootBtn').hidden = false;
+  })();
+  function engage() {
+    $('boot').style.opacity = 0; setTimeout(() => $('boot').remove(), 800);
+    const hr = +new Date().toLocaleString('en-GB', {timeZone: tz, hour: '2-digit', hour12: false});
+    const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+    speak(`${greet}. Welcome to The Huddle. All systems are online.`);
+  }
+  $('bootBtn').addEventListener('click', engage);
+
+  // Seed + start
+  state.guests = 64;
+  for (let k = 0; k < 7; k++) state.busy.add(Math.floor(rnd(0, 16)));
+  for (let k = 0; k < 20; k++) { state.rev += rnd(200, 800) * 1000; state.revHist.push(state.rev); }
+  state.pints = 142;
+  renderFixtures(); renderStock(); renderBookings(); renderZones(); renderRev(); tickClock();
+  log('Core online.'); log('Display feeds synchronised.');
+  setInterval(tickClock, 1000);
+  setInterval(simulate, 5000);
+})();
+</script>
+</body>
+</html>
