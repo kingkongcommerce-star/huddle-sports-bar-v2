@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Huddle Command</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Oswald:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#03070b;
+    --panel:rgba(8,24,34,.62);
+    --line:rgba(0,229,255,.22);
+    --line-strong:rgba(0,229,255,.55);
+    --cyan:#00e5ff;
+    --cyan-dim:#5fb7c6;
+    --orange:#ff5c00;
+    --green:#3dffa2;
+    --red:#ff3b5c;
+    --text:#d8f6ff;
+    --muted:#6f98a3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;font-weight:300;
+    background-image:
+      radial-gradient(ellipse at 50% 40%,rgba(0,229,255,.08),transparent 60%),
+      linear-gradient(rgba(0,229,255,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,229,255,.035) 1px,transparent 1px);
+    background-size:auto,40px 40px,40px 40px;
+    overflow-x:hidden;
+  }
+  body::after{ /* scanlines */
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);
+  }
+  .mono{font-family:'Share Tech Mono',monospace;}
+  .orb{font-family:'Orbitron',sans-serif;letter-spacing:2px;text-transform:uppercase;}
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+
+  /* TOP BAR */
+  header{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(0,229,255,.06),transparent);
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand .logo{width:34px;height:34px;border:2px solid var(--cyan);border-radius:50%;position:relative;box-shadow:0 0 14px var(--cyan);}
+  .brand .logo::after{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);}
+  .brand h1{font-size:18px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,.6);}
+  .brand small{display:block;font-size:10px;color:var(--muted);letter-spacing:3px;}
+  .sys{display:flex;gap:22px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+  .sys b{color:var(--text);font-weight:400;}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);margin-right:6px;animation:blink 1.6s infinite;}
+  @keyframes blink{50%{opacity:.3;}}
+  .clock{font-size:26px;color:var(--cyan);text-shadow:0 0 12px rgba(0,229,255,.5);}
+
+  /* GRID */
+  .grid{
+    display:grid;gap:16px;padding:18px 24px 24px;
+    grid-template-columns:minmax(260px,1fr) minmax(320px,1.25fr) minmax(260px,1fr);
+    grid-template-areas:
+      "fix core tables"
+      "screens core events"
+      "chart chart log";
+  }
+  .panel{
+    background:var(--panel);border:1px solid var(--line);position:relative;padding:16px 16px 14px;
+    clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));
+    backdrop-filter:blur(4px);min-width:0;
+  }
+  .panel::before{ /* corner brackets */
+    content:"";position:absolute;top:0;left:0;width:22px;height:22px;
+    border-top:2px solid var(--cyan);border-left:2px solid var(--cyan);
+  }
+  .panel::after{
+    content:"";position:absolute;bottom:0;right:0;width:22px;height:22px;
+    border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan);
+  }
+  .panel h2{
+    font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:3px;color:var(--cyan);
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;
+  }
+  .panel h2 span{color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;}
+
+  /* FIXTURES */
+  .fixtures{grid-area:fix;}
+  .fx{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line);}
+  .fx:last-child{border-bottom:none;}
+  .fx .t{font-family:'Share Tech Mono',monospace;color:var(--cyan);font-size:15px;}
+  .fx .m{font-size:15px;line-height:1.2;}
+  .fx .m small{display:block;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase;}
+  .fx .st{font-family:'Share Tech Mono',monospace;font-size:11px;padding:3px 7px;border:1px solid var(--line-strong);color:var(--cyan-dim);white-space:nowrap;}
+  .fx .st.live{border-color:var(--red);color:var(--red);animation:blink 1s infinite;}
+  .fx .st.done{opacity:.4;}
+  .countdown{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);letter-spacing:1px;}
+  .countdown b{display:block;font-family:'Orbitron',sans-serif;color:var(--orange);font-size:24px;letter-spacing:3px;text-shadow:0 0 10px rgba(255,92,0,.5);margin-top:4px;}
+
+  /* CORE */
+  .core{grid-area:core;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;clip-path:none;background:transparent;border:none;backdrop-filter:none;}
+  .core::before,.core::after{display:none;}
+  .reactor{position:relative;width:min(100%,420px);aspect-ratio:1;}
+  .reactor svg{width:100%;height:100%;overflow:visible;}
+  .spin{transform-origin:200px 200px;animation:spin 24s linear infinite;}
+  .spin.rev{animation-direction:reverse;animation-duration:16s;}
+  .spin.fast{animation-duration:8s;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .reactor-btn{
+    position:absolute;inset:32%;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(circle,rgba(0,229,255,.25),rgba(0,229,255,.03) 70%);
+    transition:transform .2s, box-shadow .2s;
+  }
+  .reactor-btn:hover{transform:scale(1.04);box-shadow:0 0 40px rgba(0,229,255,.35);}
+  .reactor-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:4px;}
+  .reactor-btn .pct{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(30px,6vw,52px);color:#fff;text-shadow:0 0 18px var(--cyan);}
+  .reactor-btn .lbl{font-size:11px;letter-spacing:3px;color:var(--cyan);text-transform:uppercase;}
+  .reactor.listening .reactor-btn{animation:pulse 1s infinite;}
+  @keyframes pulse{50%{box-shadow:0 0 70px rgba(0,229,255,.7);}}
+  .speech{min-height:48px;text-align:center;max-width:460px;font-size:16px;color:var(--text);}
+  .speech .who{color:var(--cyan);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;display:block;margin-bottom:4px;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;max-width:520px;}
+  .kpi{border:1px solid var(--line);padding:10px 6px;text-align:center;background:rgba(0,229,255,.03);}
+  .kpi b{display:block;font-family:'Orbitron',sans-serif;font-size:20px;color:var(--cyan);}
+  .kpi span{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+
+  /* SCREENS */
+  .screens{grid-area:screens;}
+  .scr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .scr{border:1px solid var(--line);padding:10px 8px;min-height:72px;position:relative;background:rgba(0,0,0,.25);text-align:left;transition:border-color .2s;}
+  .scr:hover{border-color:var(--cyan);}
+  .scr i{font-style:normal;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);}
+  .scr p{font-size:13px;margin-top:4px;line-height:1.2;}
+  .scr.on::after{content:"";position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);}
+
+  /* TABLES */
+  .tables{grid-area:tables;}
+  .tbl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .tbl{
+    aspect-ratio:1;border:1px solid var(--line-strong);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'Share Tech Mono',monospace;font-size:12px;transition:all .2s;background:rgba(61,255,162,.04);
+  }
+  .tbl b{font-family:'Orbitron',sans-serif;font-size:14px;}
+  .tbl.free{color:var(--green);border-color:rgba(61,255,162,.5);}
+  .tbl.busy{color:var(--orange);border-color:var(--orange);background:rgba(255,92,0,.1);box-shadow:inset 0 0 14px rgba(255,92,0,.25);}
+  .tbl.held{color:var(--cyan);border-color:var(--cyan);background:rgba(0,229,255,.08);}
+  .legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--muted);letter-spacing:1px;}
+  .legend i{display:inline-block;width:9px;height:9px;margin-right:5px;vertical-align:middle;}
+
+  /* EVENTS */
+  .events{grid-area:events;}
+  .ev{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px;}
+  .ev:last-child{border-bottom:none;}
+  .ev small{display:block;color:var(--muted);font-size:11px;letter-spacing:1px;}
+  .ev .pax{font-family:'Orbitron',sans-serif;color:var(--orange);font-size:14px;white-space:nowrap;}
+
+  /* CHART */
+  .chart{grid-area:chart;}
+  .chart canvas{width:100%;height:150px;display:block;}
+
+  /* LOG */
+  .log{grid-area:log;display:flex;flex-direction:column;}
+  .log-out{flex:1;min-height:110px;max-height:150px;overflow-y:auto;font-family:'Share Tech Mono',monospace;font-size:12px;line-height:1.6;color:var(--cyan-dim);}
+  .log-out .u{color:var(--orange);}
+  .log-out .j{color:var(--text);}
+  .cmd{display:flex;gap:8px;margin-top:8px;border-top:1px solid var(--line);padding-top:8px;}
+  .cmd span{color:var(--cyan);font-family:'Share Tech Mono',monospace;}
+  .cmd input{flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:13px;}
+
+  .sample{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--orange);border:1px solid rgba(255,92,0,.5);padding:2px 6px;letter-spacing:1px;}
+
+  @media(max-width:1100px){
+    .grid{grid-template-columns:1fr 1fr;grid-template-areas:"core core" "fix tables" "screens events" "chart chart" "log log";}
+  }
+  @media(max-width:680px){
+    header{padding:12px 16px;}
+    .grid{grid-template-columns:1fr;padding:14px 16px;grid-template-areas:"core" "fix" "tables" "screens" "events" "chart" "log";}
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .sys .hide-sm{display:none;}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none !important;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo"></div>
+    <div><h1 class="orb">H.U.D.D.L.E.</h1><small>HOUSE OPS · DISTRICT 1 · SAIGON</small></div>
+  </div>
+  <div class="sys">
+    <span><span class="dot"></span><b>ALL SYSTEMS NOMINAL</b></span>
+    <span class="hide-sm mono" id="dateLbl"></span>
+    <span class="sample" title="No live data source is connected yet">MANUAL DATA</span>
+    <span class="clock mono" id="clock">--:--:--</span>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="panel fixtures">
+    <h2>TONIGHT'S FIXTURES <span>ICT · UTC+7</span></h2>
+    <div id="fxList"></div>
+    <div class="countdown">NEXT KICKOFF<b id="cd">--:--:--</b></div>
+  </section>
+
+  <section class="panel core">
+    <div class="reactor" id="reactor">
+      <svg viewBox="0 0 400 400" aria-hidden="true">
+        <defs>
+          <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <g filter="url(#glow)" fill="none" stroke="#00e5ff">
+          <circle cx="200" cy="200" r="190" stroke-opacity=".15"/>
+          <g class="spin"><circle cx="200" cy="200" r="178" stroke-width="2" stroke-dasharray="4 10" stroke-opacity=".6"/></g>
+          <g class="spin rev"><circle cx="200" cy="200" r="160" stroke-width="6" stroke-dasharray="80 30 10 30" stroke-opacity=".5"/></g>
+          <circle cx="200" cy="200" r="142" stroke-width="10" stroke-opacity=".1"/>
+          <circle id="occArc" cx="200" cy="200" r="142" stroke-width="10" stroke="#00e5ff" stroke-linecap="round"
+                  stroke-dasharray="0 1000" transform="rotate(-90 200 200)" style="transition:stroke-dasharray 1s"/>
+          <g class="spin fast"><circle cx="200" cy="200" r="122" stroke-width="1.5" stroke-dasharray="2 6" stroke-opacity=".7"/></g>
+          <g class="spin rev" id="ticks"></g>
+        </g>
+      </svg>
+      <button class="reactor-btn" id="talk" aria-label="Talk to Huddle assistant">
+        <span class="pct" id="occPct">0%</span>
+        <span class="lbl">Capacity</span>
+      </button>
+    </div>
+    <div class="speech" id="speech"><span class="who">ASSISTANT</span>Tap the core or type a command. Say "help" to see what I can do.</div>
+    <div class="kpis">
+      <div class="kpi"><b id="kGuests">0</b><span>Guests In</span></div>
+      <div class="kpi"><b id="kTables">0/0</b><span>Tables</span></div>
+      <div class="kpi"><b id="kScreens">0</b><span>Screens Live</span></div>
+      <div class="kpi"><b id="kEvents">0</b><span>Bookings</span></div>
+    </div>
+  </section>
+
+  <section class="panel tables">
+    <h2>FLOOR STATUS <span>TAP TO CYCLE</span></h2>
+    <div class="tbl-grid" id="tblGrid"></div>
+    <div class="legend">
+      <span><i style="background:var(--green)"></i>FREE</span>
+      <span><i style="background:var(--orange)"></i>SEATED</span>
+      <span><i style="background:var(--cyan)"></i>RESERVED</span>
+    </div>
+  </section>
+
+  <section class="panel screens">
+    <h2>SCREEN ROUTING <span>6 FEEDS</span></h2>
+    <div class="scr-grid" id="scrGrid"></div>
+  </section>
+
+  <section class="panel events">
+    <h2>PRIVATE BOOKINGS <span>20–30 PAX</span></h2>
+    <div id="evList"></div>
+  </section>
+
+  <section class="panel chart">
+    <h2>FOOTFALL · GUESTS PER HOUR <span>TODAY</span></h2>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <section class="panel log">
+    <h2>COMMAND LOG <span id="micState">MIC: STANDBY</span></h2>
+    <div class="log-out" id="logOut"></div>
+    <form class="cmd" id="cmdForm" autocomplete="off">
+      <span>&gt;</span><input id="cmdIn" placeholder="e.g. seat table 4 · next match · status · help" aria-label="Command">
+    </form>
+  </section>
+</div>
+
+<script>
+(() => {
+  const TZ = 'Asia/Ho_Chi_Minh';
+  const CAPACITY = 80;
+  const STORE = 'huddle-command-v1';
+
+  // --- State (edit here, or via commands; saved per-browser) -------------
+  const defaults = {
+    guests: 34,
+    fixtures: [
+      { time: '18:30', home: 'Brighton',  away: 'Newcastle', comp: 'Premier League' },
+      { time: '21:00', home: 'Arsenal',   away: 'Chelsea',   comp: 'Premier League' },
+      { time: '23:30', home: 'Liverpool', away: 'Man City',  comp: 'Premier League' },
+      { time: '02:00', home: 'Real Madrid', away: 'Barcelona', comp: 'La Liga' },
+    ],
+    tables: [
+      ['T1','busy'],['T2','free'],['T3','busy'],['T4','held'],
+      ['T5','free'],['T6','busy'],['B1','busy'],['B2','held'],
+      ['POOL1','busy'],['POOL2','free'],['DART1','busy'],['DART2','free'],
+    ],
+    screens: ['Arsenal v Chelsea','Arsenal v Chelsea','Liverpool v Man City','F1 Highlights','UFC Replay','OFF'],
+    events: [
+      { date: 'Fri 24', name: 'Company night — Grab team', pax: 28 },
+      { date: 'Sat 25', name: 'Birthday — Minh', pax: 22 },
+      { date: 'Sun 26', name: 'Fantasy league draft', pax: 20 },
+    ],
+    footfall: [4,6,9,12,10,14,22,31,38,34],
+  };
+  let S;
+  try { S = JSON.parse(localStorage.getItem(STORE)) || structuredClone(defaults); }
+  catch { S = structuredClone(defaults); }
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch {} };
+
+  const $ = id => document.getElementById(id);
+
+  // --- Clock / time helpers ---------------------------------------------
+  const nowParts = () => {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:TZ,hour12:false,
+      year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',weekday:'short'})
+      .formatToParts(new Date()).map(x=>[x.type,x.value]));
+    return p;
+  };
+  const secOfDay = () => { const p = nowParts(); return (+p.hour%24)*3600 + +p.minute*60 + +p.second; };
+  // Treat 00:00–05:59 kickoffs as "after midnight tonight".
+  const fxSec = t => { const [h,m] = t.split(':').map(Number); return ((h < 6 ? h + 24 : h) * 3600) + m * 60; };
+  const nowSecShift = () => { const s = secOfDay(); return s < 6*3600 ? s + 86400 : s; };
+
+  function tick(){
+    const p = nowParts();
+    $('clock').textContent = `${p.hour}:${p.minute}:${p.second}`;
+    $('dateLbl').textContent = `${p.weekday.toUpperCase()} ${p.day}.${p.month}.${p.year}`;
+    renderFixtures();
+  }
+
+  // --- Renderers ---------------------------------------------------------
+  function fxStatus(f){
+    const d = nowSecShift() - fxSec(f.time);
+    if (d < 0) return ['UPCOMING',''];
+    if (d < 115*60) return ['● LIVE','live'];
+    return ['FT','done'];
+  }
+  function nextFixture(){
+    const n = nowSecShift();
+    return [...S.fixtures].sort((a,b)=>fxSec(a.time)-fxSec(b.time)).find(f => fxSec(f.time) > n);
+  }
+  function renderFixtures(){
+    const list = [...S.fixtures].sort((a,b)=>fxSec(a.time)-fxSec(b.time));
+    $('fxList').innerHTML = list.map(f => {
+      const [lbl,cls] = fxStatus(f);
+      return `<div class="fx"><span class="t">${f.time}</span><span class="m">${esc(f.home)} v ${esc(f.away)}<small>${esc(f.comp)}</small></span><span class="st ${cls}">${lbl}</span></div>`;
+    }).join('') || '<div class="fx"><span class="m" style="grid-column:1/-1;color:var(--muted)">No fixtures. Try: add match Arsenal v Spurs 21:00</span></div>';
+    const nx = nextFixture();
+    if (nx){
+      const s = fxSec(nx.time) - nowSecShift();
+      const hh = String(Math.floor(s/3600)).padStart(2,'0'), mm = String(Math.floor(s%3600/60)).padStart(2,'0'), ss = String(s%60).padStart(2,'0');
+      $('cd').textContent = `${hh}:${mm}:${ss}`;
+    } else $('cd').textContent = 'DONE FOR TONIGHT';
+  }
+  function renderTables(){
+    $('tblGrid').innerHTML = S.tables.map(([n,s],i) =>
+      `<button class="tbl ${s}" data-i="${i}" aria-label="${n} ${s}"><b>${n}</b>${s==='busy'?'SEATED':s==='held'?'RSVD':'FREE'}</button>`).join('');
+  }
+  function renderScreens(){
+    $('scrGrid').innerHTML = S.screens.map((c,i) =>
+      `<button class="scr ${c!=='OFF'?'on':''}" data-i="${i}"><i>SCR-0${i+1}</i><p>${esc(c)}</p></button>`).join('');
+  }
+  function renderEvents(){
+    $('evList').innerHTML = S.events.map(e =>
+      `<div class="ev"><span>${esc(e.name)}<small>${esc(e.date)}</small></span><span class="pax">${e.pax} PAX</span></div>`).join('')
+      || '<div class="ev" style="color:var(--muted)">No bookings yet.</div>';
+  }
+  function renderKpis(){
+    const pct = Math.min(100, Math.round(S.guests / CAPACITY * 100));
+    $('occPct').textContent = pct + '%';
+    const C = 2*Math.PI*142;
+    $('occArc').setAttribute('stroke-dasharray', `${C*pct/100} ${C}`);
+    $('occArc').setAttribute('stroke', pct > 85 ? '#ff5c00' : '#00e5ff');
+    const busy = S.tables.filter(t=>t[1]!=='free').length;
+    $('kGuests').textContent = S.guests;
+    $('kTables').textContent = `${busy}/${S.tables.length}`;
+    $('kScreens').textContent = S.screens.filter(c=>c!=='OFF').length;
+    $('kEvents').textContent = S.events.length;
+  }
+  function renderChart(){
+    const cv = $('chart'), dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w*dpr; cv.height = h*dpr;
+    const g = cv.getContext('2d'); g.scale(dpr,dpr);
+    const data = S.footfall, max = Math.max(40, ...data);
+    const pad = {l:28,r:10,t:10,b:20}, iw = w-pad.l-pad.r, ih = h-pad.t-pad.b;
+    const bw = iw / data.length;
+    g.font = '10px "Share Tech Mono", monospace';
+    g.fillStyle = '#6f98a3'; g.strokeStyle = 'rgba(0,229,255,.12)';
+    [0,.5,1].forEach(f => { const y = pad.t + ih*(1-f); g.beginPath(); g.moveTo(pad.l,y); g.lineTo(w-pad.r,y); g.stroke(); g.fillText(Math.round(max*f), 2, y+3); });
+    data.forEach((v,i) => {
+      const bh = ih * v / max, x = pad.l + i*bw + bw*.18, y = pad.t + ih - bh;
+      const last = i === data.length-1;
+      const grad = g.createLinearGradient(0,y,0,y+bh);
+      grad.addColorStop(0, last ? '#ff5c00' : '#00e5ff'); grad.addColorStop(1, 'rgba(0,229,255,.05)');
+      g.fillStyle = grad; g.fillRect(x, y, bw*.64, bh);
+      g.fillStyle = '#6f98a3';
+      g.fillText(String((+nowParts().hour - (data.length-1-i) + 48) % 24).padStart(2,'0'), x, h-5);
+    });
+  }
+  const renderAll = () => { renderFixtures(); renderTables(); renderScreens(); renderEvents(); renderKpis(); renderChart(); };
+
+  // --- Ticks on the reactor ring ----------------------------------------
+  (() => {
+    let s = '';
+    for (let i=0;i<60;i++){ const a = i*6*Math.PI/180, r1 = 100, r2 = i%5?106:112;
+      s += `<line x1="${200+r1*Math.cos(a)}" y1="${200+r1*Math.sin(a)}" x2="${200+r2*Math.cos(a)}" y2="${200+r2*Math.sin(a)}" stroke-opacity="${i%5?.4:.9}"/>`; }
+    $('ticks').innerHTML = s;
+  })();
+
+  // --- Assistant ---------------------------------------------------------
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function log(cls, text){
+    const p = nowParts();
+    const d = document.createElement('div'); d.className = cls;
+    d.textContent = `[${p.hour}:${p.minute}] ${cls==='u'?'YOU':'AI '} › ${text}`;
+    $('logOut').appendChild(d); $('logOut').scrollTop = 1e9;
+  }
+  function say(text){
+    $('speech').innerHTML = `<span class="who">ASSISTANT</span>${esc(text)}`;
+    log('j', text);
+    try {
+      if ('speechSynthesis' in window && voiceOn){
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        const v = speechSynthesis.getVoices().find(v => /en-GB/i.test(v.lang) && /male|daniel|george|arthur/i.test(v.name))
+               || speechSynthesis.getVoices().find(v => /en-GB/i.test(v.lang));
+        if (v) u.voice = v; u.rate = 1.02; u.pitch = .9;
+        speechSynthesis.speak(u);
+      }
+    } catch {}
+  }
+  const findTable = q => S.tables.findIndex(t => t[0].toLowerCase() === q.toLowerCase() || t[0].toLowerCase() === ('t'+q).toLowerCase());
+
+  function handle(raw){
+    const q = raw.trim(); if (!q) return;
+    log('u', q);
+    const l = q.toLowerCase();
+    let m;
+
+    if (/^(help|\?)/.test(l)) return say('Try: status · next match · seat table 3 · free table 3 · reserve table 5 · guests 50 · add match Arsenal v Spurs 21:00 · screen 2 Spurs v Chelsea · book Sat 25 Birthday Lan 24 · voice on · reset.');
+    if (/status|report|how.*(we|it).*doing/.test(l)){
+      const busy = S.tables.filter(t=>t[1]==='busy').length, free = S.tables.filter(t=>t[1]==='free').length;
+      const nx = nextFixture();
+      return say(`House is at ${Math.round(S.guests/CAPACITY*100)} percent with ${S.guests} guests. ${busy} tables seated, ${free} free. ${nx ? `Next kickoff ${nx.home} versus ${nx.away} at ${nx.time}.` : 'No more kickoffs tonight.'}`);
+    }
+    if (/next (match|game|kick)/.test(l)){
+      const nx = nextFixture();
+      return say(nx ? `${nx.home} versus ${nx.away}, ${nx.comp}, kicks off at ${nx.time}. ${$('cd').textContent} to go.` : 'Nothing else on the schedule tonight.');
+    }
+    if (/^(what.*time|time)/.test(l)) return say(`It's ${$('clock').textContent} in Saigon.`);
+    if ((m = l.match(/(seat|busy|occupy|free|clear|reserve|hold)\s+(?:table\s+)?([a-z]*\d+)/))){
+      const i = findTable(m[2]); if (i < 0) return say(`I can't find table ${m[2]}.`);
+      const st = /seat|busy|occupy/.test(m[1]) ? 'busy' : /free|clear/.test(m[1]) ? 'free' : 'held';
+      S.tables[i][1] = st; save(); renderTables(); renderKpis();
+      return say(`${S.tables[i][0]} marked ${st==='busy'?'seated':st==='held'?'reserved':'free'}.`);
+    }
+    if ((m = l.match(/guests?\s*(?:to|=|at)?\s*(\d+)/)) || (m = l.match(/^(\d+)\s+guests?/))){
+      S.guests = Math.max(0, +m[1]); S.footfall[S.footfall.length-1] = S.guests; save(); renderKpis(); renderChart();
+      return say(`Headcount updated to ${S.guests}.`);
+    }
+    if ((m = l.match(/^(\+|-)\s*(\d+)$/))){
+      S.guests = Math.max(0, S.guests + (m[1]==='+'?1:-1) * +m[2]); S.footfall[S.footfall.length-1] = S.guests; save(); renderKpis(); renderChart();
+      return say(`${S.guests} guests in the house.`);
+    }
+    if ((m = q.match(/add (?:match|game|fixture)\s+(.+?)\s+(?:v|vs|versus)\.?\s+(.+?)\s+(?:at\s+)?(\d{1,2}):?(\d{2})(?:\s+(.+))?$/i))){
+      const time = `${m[3].padStart(2,'0')}:${m[4]}`;
+      S.fixtures.push({ home:m[1], away:m[2], time, comp:m[5]||'Live' }); save(); renderFixtures();
+      return say(`Added ${m[1]} versus ${m[2]} at ${time}.`);
+    }
+    if ((m = q.match(/(?:remove|drop|delete) (?:match|game|fixture)\s+(.+)/i))){
+      const k = m[1].toLowerCase(), before = S.fixtures.length;
+      S.fixtures = S.fixtures.filter(f => !(`${f.home} ${f.away}`.toLowerCase().includes(k))); save(); renderFixtures();
+      return say(before === S.fixtures.length ? `No fixture matching ${m[1]}.` : `Removed.`);
+    }
+    if ((m = q.match(/screen\s*(\d)\s+(?:to\s+)?(.+)/i))){
+      const i = +m[1]-1; if (!S.screens[i] && S.screens[i] !== '') return say(`There is no screen ${m[1]}.`);
+      S.screens[i] = /^off$/i.test(m[2]) ? 'OFF' : m[2]; save(); renderScreens(); renderKpis();
+      return say(`Screen ${m[1]} now showing ${S.screens[i]==='OFF'?'nothing':S.screens[i]}.`);
+    }
+    if ((m = q.match(/book\s+(\w{3}\s+\d{1,2})\s+(.+?)\s+(\d{1,3})(?:\s*pax)?$/i))){
+      S.events.push({ date:m[1], name:m[2], pax:+m[3] }); save(); renderEvents(); renderKpis();
+      return say(`Booked ${m[2]} for ${m[3]} on ${m[1]}.${+m[3] > 30 ? ' Heads up, that is over the 30 person limit.' : ''}`);
+    }
+    if (/^voice (on|off)/.test(l)){ voiceOn = l.endsWith('on'); return say(`Voice ${voiceOn?'enabled':'muted'}.`); }
+    if (/^reset/.test(l)){ S = structuredClone(defaults); save(); renderAll(); return say('Board reset to defaults.'); }
+    if (/^(hi|hello|hey|yo)\b|jarvis/.test(l)) return say('At your service. The house is running, the beer is cold. What do you need?');
+    say(`I didn't catch that. Say "help" for the command list.`);
+  }
+
+  // --- Voice input -------------------------------------------------------
+  let voiceOn = true;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null;
+  $('talk').addEventListener('click', () => {
+    if (!SR){ say('Voice input is not supported in this browser. Type in the command line below.'); $('cmdIn').focus(); return; }
+    if (rec){ rec.stop(); return; }
+    rec = new SR(); rec.lang = 'en-US'; rec.interimResults = false;
+    rec.onstart = () => { $('reactor').classList.add('listening'); $('micState').textContent = 'MIC: LISTENING'; };
+    rec.onend = () => { $('reactor').classList.remove('listening'); $('micState').textContent = 'MIC: STANDBY'; rec = null; };
+    rec.onerror = e => say(`Mic error: ${e.error}.`);
+    rec.onresult = e => handle(e.results[0][0].transcript);
+    rec.start();
+  });
+
+  // --- Interactions ------------------------------------------------------
+  $('cmdForm').addEventListener('submit', e => { e.preventDefault(); handle($('cmdIn').value); $('cmdIn').value=''; });
+  $('tblGrid').addEventListener('click', e => {
+    const b = e.target.closest('.tbl'); if (!b) return;
+    const t = S.tables[b.dataset.i], order = ['free','busy','held'];
+    t[1] = order[(order.indexOf(t[1])+1)%3]; save(); renderTables(); renderKpis();
+  });
+  $('scrGrid').addEventListener('click', e => {
+    const b = e.target.closest('.scr'); if (!b) return;
+    const v = prompt(`Screen ${+b.dataset.i+1} feed (or OFF):`, S.screens[b.dataset.i]);
+    if (v !== null){ S.screens[b.dataset.i] = v.trim() || 'OFF'; save(); renderScreens(); renderKpis(); }
+  });
+  window.addEventListener('resize', renderChart);
+
+  renderAll(); tick(); setInterval(tick, 1000);
+  log('j', 'H.U.D.D.L.E. online. Data is entered by hand; nothing is pulled from a live feed.');
+})();
+</script>
+</body>
+</html>
